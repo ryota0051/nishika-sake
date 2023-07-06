@@ -1,0 +1,32 @@
+version: "3"
+
+services:
+  notebook:
+    image: "nishika-sake"
+    command: jupyter-lab --ip 0.0.0.0 --allow-root --NotebookApp.token=''
+    build: .
+    volumes:
+      - ./src:/work/src
+      - ./data:/work/data
+      - ./notebooks:/work/notebooks
+      - ./output:/work/output
+      - ./tools:/work/tools
+    ports:
+      - 8888:8888
+    privileged: true
+    tty: true
+    shm_size: "2gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  tensorboard:
+    image: "nishika-sake"
+    command: tensorboard --logdir /work/output --bind_all
+    volumes:
+      - ./output:/work/output
+    ports:
+      - 6006:6006
