@@ -11,6 +11,8 @@ services:
       - ./notebooks:/work/notebooks
       - ./output:/work/output
       - ./tools:/work/tools
+      - ./poetry.lock:/work/poetry.lock
+      - ./pyproject.toml:/work/pyproject.toml
     ports:
       - 8888:8888
     privileged: true
