@@ -22,6 +22,8 @@ tensorboard = "~2.13.0"
 pytorch-metric-learning = "~2.2.0"
 llvmlite = "~0.40.1"
 umap-learn = "~0.5.3"
+plotly = "~5.15.0"
+python-pptx = "~0.6.21"
 
 
 [tool.poetry.group.dev.dependencies]
