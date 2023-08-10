@@ -25,6 +25,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    cpus: 0.8
   tensorboard:
     image: "nishika-sake"
     command: tensorboard --logdir /work/output --bind_all
