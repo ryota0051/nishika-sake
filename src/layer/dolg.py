@@ -3,10 +3,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from src.layer.arcface_adaptive_margin import (
-    ArcMarginProduct,
-    ArcMarginProduct_subcenter,
-)
+from src.layer.arcface import ArcMarginProduct
+from src.layer.arcface_adaptive_margin import ArcMarginProduct_subcenter
 from src.layer.gem import GeM
 
 
@@ -144,7 +142,9 @@ class Dolg(nn.Module):
 
         self.head_in_units = self.embedding_size
         if self.cfg.use_product == "normal":
-            self.head = ArcMarginProduct(self.embedding_size, self.n_classes)
+            self.head = ArcMarginProduct(
+                self.embedding_size, self.n_classes, ls_eps=0.1
+            )
         elif self.cfg.use_product == "sub-center":
             self.head = ArcMarginProduct_subcenter(self.embedding_size, self.n_classes)
         else:
@@ -165,10 +165,10 @@ class Dolg(nn.Module):
         self.attention2d = SpatialAttention2d(feature_dim_l_g)
         self.fusion = OrthogonalFusion()
 
-    def forward(self, x):
+    def forward(self, x, label):
         x_emb = self.extract_features(x)
 
-        logits = self.head(x_emb)
+        logits = self.head(x_emb, label)
         return logits
 
     def extract_features(self, x):
