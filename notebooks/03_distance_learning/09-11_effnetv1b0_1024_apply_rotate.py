@@ -76,7 +76,15 @@ class Config:
     training = True
     evaluation = True
     embedding = True
-    embedding_dim = 1024
+    embedding_dim = 512
+
+    base_model_root = (
+        OUTPUT_ROOT
+        / "train_arcface_with_label_smoothing"
+        / "outputs"
+        / "effnetb0_apply_rotate_and_focal_loss"
+        / "models"
+    )
 
     seed = 8823
     n_fold = 5
@@ -108,7 +116,7 @@ class Config:
 
     scheduler = dict(
         scheduler_name="cosine",
-        num_warmup_steps_rate=0.1,
+        num_warmup_steps_rate=0,
         num_cycles=0.5,
     )
     batch_scheduler = True
@@ -356,15 +364,15 @@ def get_transforms(size, data="train", p=0.5):
 
 
 class CustomModel(nn.Module):
-    def __init__(self, config, pretrained=False, ls_eps=Config.label_smoothing):
+    def __init__(self, config, pretrained=False, ls_eps=0.1):
         super().__init__()
         self.config = config
-        self.model = timm.create_model(
-            self.config.model_name, pretrained=pretrained, features_only=True
-        )
-        self.n_features = self.model.feature_info[-1]["num_chs"]
-        self.global_pool = GeM()
+        self.model = timm.create_model(self.config.model_name, pretrained=pretrained)
+        self.n_features = self.model.classifier.in_features
+        self.model.global_pool = GeM()
+        self.model.classifier = nn.Identity()  # custom head にするため
         self.fc = nn.Linear(self.n_features, config.embedding_dim)
+        self.bn = nn.BatchNorm1d(config.embedding_dim)
         self.final = ArcMarginProduct(
             config.embedding_dim, config.num_classes, ls_eps=ls_eps
         )
@@ -376,9 +384,9 @@ class CustomModel(nn.Module):
 
     def extract_features(self, images, labels=None):
         bs = images.size(0)
-        x = self.model(images)[-1]
-        x = self.global_pool(x).view(bs, -1)
+        x = self.model(images).view(bs, -1)
         x = self.fc(x)
+        x = self.bn(x)
         return x
 
 
@@ -577,6 +585,7 @@ def train_loop(config, name, train_df, valid_df, device, summary_writer, criteri
     # set model & optimizer
     model = CustomModel(config, pretrained=True)
     model.to(device)
+    model.load_state_dict(torch.load(config.base_model_root / f"{name}.pth"))
     criterion.to(device)
     params = [{"params": model.parameters()}, {"params": criterion.parameters()}]
     optimizer = get_optimizer(optimizer_config=config.optimizer, params=params)
@@ -679,7 +688,7 @@ if Config.training:
 
         train_df_fold = train_df[train_df["fold"] != i_fold]
         valid_df_fold = train_df[train_df["fold"] == i_fold]
-        criterion = nn.CrossEntropyLoss(label_smoothing=Config.label_smoothing)
+        criterion = FocalLoss()
 
         summary_writer = SummaryWriter(log_dir=OUTPUTS_EXP / f"fold_{i_fold}")
         train_loop(
